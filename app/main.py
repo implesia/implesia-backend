@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.requests import Request
@@ -72,6 +73,9 @@ async def _rate_limit_handler(_: Request, exc: RateLimitExceeded) -> JSONRespons
 
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+settings.media_root.mkdir(parents=True, exist_ok=True)
+app.mount("/media", StaticFiles(directory=settings.media_root), name="media")
 
 
 @app.get("/", tags=["meta"])

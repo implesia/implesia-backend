@@ -169,6 +169,7 @@ class PortfolioProjectPublic(PortfolioProjectBase):
 
     id: uuid.UUID
     slug: str
+    image_url: str | None = None
     created_at: datetime
     updated_at: datetime
 

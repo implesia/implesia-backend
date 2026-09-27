@@ -17,6 +17,9 @@ htmlcov/
 *.db
 *.sqlite3
 
+media/portfolio/*
+!media/portfolio/.gitkeep
+
 .DS_Store
 .idea/
 .vscode/

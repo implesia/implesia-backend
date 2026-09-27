@@ -1,3 +1,5 @@
+import json
+
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -29,21 +31,58 @@ PROJECT = {
     "internal_notes": "Do not show this note on the public website.",
 }
 
+# 1×1 PNG
+_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0P"
+    b"\x0f\x00\x01\x01\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+def _project_request(overrides: dict | None = None, *, image: bool = True) -> dict:
+    source = {**PROJECT, **(overrides or {})}
+    data = {
+        "name": source["name"],
+        "slug": source["slug"],
+        "tagline": source["tagline"],
+        "category": source["category"],
+        "year": str(source["year"]),
+        "status": source["status"],
+        "summary": source["summary"],
+        "tech_stack": ",".join(source["tech_stack"]),
+        "live_url": source["live_url"] or "",
+        "live_label": source["live_label"] or "",
+        "outcomes": json.dumps(source["outcomes"]),
+        "is_featured": "true" if source["is_featured"] else "false",
+        "is_published": "true" if source["is_published"] else "false",
+        "sort_order": str(source["sort_order"]),
+        "internal_notes": source["internal_notes"] or "",
+    }
+    files = {"image": ("card.png", _PNG, "image/png")} if image else None
+    return {"data": data, "files": files}
+
 
 async def test_public_hides_drafts_and_internal_notes(
     client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
     await client.patch("/api/v1/admin/portfolio", json=PAGE_PATCH, headers=auth_headers)
     created = await client.post(
-        "/api/v1/admin/portfolio/projects", json=PROJECT, headers=auth_headers
+        "/api/v1/admin/portfolio/projects", headers=auth_headers, **_project_request()
     )
     assert created.status_code == 201, created.text
     assert created.json()["internal_notes"].startswith("Do not show")
+    assert created.json()["image_url"].startswith("/media/portfolio/")
+    image = await client.get(created.json()["image_url"])
+    assert image.status_code == 200
+    assert image.headers["content-type"].startswith("image/")
 
     draft = await client.post(
         "/api/v1/admin/portfolio/projects",
-        json={**PROJECT, "name": "Draft Case", "slug": "draft-case", "is_published": False},
         headers=auth_headers,
+        **_project_request(
+            {"name": "Draft Case", "slug": "draft-case", "is_published": False},
+            image=False,
+        ),
     )
     assert draft.status_code == 201
 
@@ -69,8 +108,8 @@ async def test_public_rejects_javascript_live_url(
 ) -> None:
     response = await client.post(
         "/api/v1/admin/portfolio/projects",
-        json={**PROJECT, "slug": "bad-url", "live_url": "javascript:alert(1)"},
         headers=auth_headers,
+        **_project_request({"slug": "bad-url", "live_url": "javascript:alert(1)"}, image=False),
     )
     assert response.status_code == 422
     assert response.json()["error"]["code"] == "validation_error"
@@ -80,7 +119,7 @@ async def test_admin_crud_and_auth_boundaries(
     client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
 ) -> None:
     created = await client.post(
-        "/api/v1/admin/portfolio/projects", json=PROJECT, headers=auth_headers
+        "/api/v1/admin/portfolio/projects", headers=auth_headers, **_project_request()
     )
     assert created.status_code == 201
     project_id = created.json()["id"]
@@ -91,7 +130,7 @@ async def test_admin_crud_and_auth_boundaries(
 
     patched = await client.patch(
         f"/api/v1/admin/portfolio/projects/{project_id}",
-        json={"status": "Completed", "year": 2025},
+        data={"status": "Completed", "year": "2025"},
         headers=auth_headers,
     )
     assert patched.status_code == 200
@@ -124,13 +163,27 @@ async def test_admin_crud_and_auth_boundaries(
     assert deleted.status_code == 200
 
 
+async def test_form_body_on_json_route_stays_a_validation_error(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    response = await client.patch(
+        "/api/v1/admin/portfolio",
+        headers=auth_headers,
+        files={"hero_heading": (None, "Hello from a form")},
+    )
+    assert response.status_code == 422
+    assert response.json()["error"]["code"] == "validation_error"
+
+
 async def test_duplicate_project_slug_conflicts(
     client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
     assert (
-        await client.post("/api/v1/admin/portfolio/projects", json=PROJECT, headers=auth_headers)
+        await client.post(
+            "/api/v1/admin/portfolio/projects", headers=auth_headers, **_project_request()
+        )
     ).status_code == 201
     again = await client.post(
-        "/api/v1/admin/portfolio/projects", json=PROJECT, headers=auth_headers
+        "/api/v1/admin/portfolio/projects", headers=auth_headers, **_project_request()
     )
     assert again.status_code == 409

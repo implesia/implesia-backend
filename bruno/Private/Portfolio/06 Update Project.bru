@@ -6,15 +6,14 @@ meta {
 
 patch {
   url: {{PRIVATE_BASE_URL}}/api/v1/admin/portfolio/projects/{{PROJECT_ID}}
-  body: json
+  body: multipartForm
   auth: none
 }
 
-body:json {
-  {
-    "status": "Completed",
-    "is_published": true
-  }
+body:multipart-form {
+  status: Completed
+  is_published: true
+  ~image: @file(fixtures/portfolio-card.png)
 }
 
 settings {

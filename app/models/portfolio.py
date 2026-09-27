@@ -70,6 +70,7 @@ class PortfolioProject(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     live_label: Mapped[str | None] = mapped_column(String(120))
     outcomes: Mapped[list[dict[str, Any]]] = mapped_column(JSON, default=list, nullable=False)
     icon: Mapped[str | None] = mapped_column(String(80))
+    image_url: Mapped[str | None] = mapped_column(String(255))
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)

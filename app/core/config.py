@@ -1,4 +1,5 @@
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
 from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
@@ -28,6 +29,7 @@ class Settings(BaseSettings):
     sql_echo: bool = False
     project_name: str = "Implesia Backend"
     api_v1_prefix: str = "/api/v1"
+    media_root: Path = Path("media")
     cors_origins: CsvList = Field(default_factory=list)
 
     # Security

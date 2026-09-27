@@ -11,6 +11,7 @@ from app.schemas.portfolio import (
     PortfolioProjectCreate,
     PortfolioProjectUpdate,
 )
+from app.services.portfolio_media import delete_portfolio_image
 
 DEFAULT_PAGE_SLUG = "portfolio"
 
@@ -177,11 +178,17 @@ async def _assert_slug_free(
         raise ConflictError("A portfolio project with this slug already exists")
 
 
-async def create_project(db: AsyncSession, payload: PortfolioProjectCreate) -> PortfolioProject:
+async def create_project(
+    db: AsyncSession,
+    payload: PortfolioProjectCreate,
+    *,
+    image_url: str | None = None,
+) -> PortfolioProject:
     slug = _unique_slug(payload.name, payload.slug)
     await _assert_slug_free(db, slug)
     data = payload.model_dump(mode="json")
     data["slug"] = slug
+    data["image_url"] = image_url
     item = PortfolioProject(**data)
     db.add(item)
     await db.commit()
@@ -190,20 +197,32 @@ async def create_project(db: AsyncSession, payload: PortfolioProjectCreate) -> P
 
 
 async def update_project(
-    db: AsyncSession, item: PortfolioProject, payload: PortfolioProjectUpdate
+    db: AsyncSession,
+    item: PortfolioProject,
+    payload: PortfolioProjectUpdate,
+    *,
+    image_url: str | None = None,
+    replace_image: bool = False,
 ) -> PortfolioProject:
     data = payload.model_dump(mode="json", exclude_unset=True)
     if "slug" in data:
         new_slug = _unique_slug(data.get("name", item.name), data["slug"])
         await _assert_slug_free(db, new_slug, exclude_id=item.id)
         data["slug"] = new_slug
+    previous_image = item.image_url
     for field, value in data.items():
         setattr(item, field, value)
+    if replace_image:
+        item.image_url = image_url
     await db.commit()
     await db.refresh(item)
+    if replace_image and previous_image and previous_image != item.image_url:
+        delete_portfolio_image(previous_image)
     return item
 
 
 async def delete_project(db: AsyncSession, item: PortfolioProject) -> None:
+    image_url = item.image_url
     await db.delete(item)
     await db.commit()
+    delete_portfolio_image(image_url)
