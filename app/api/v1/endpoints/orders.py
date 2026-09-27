@@ -81,8 +81,7 @@ async def submit_order(
     service, package, model = await _resolve_targets(db, payload, published_only=True)
 
     ip = client_ip(request)
-    is_honeypot = bool(payload.website)
-    if not is_honeypot and not await verify_turnstile(payload.turnstile_token, ip):
+    if not await verify_turnstile(payload.turnstile_token, ip):
         raise SpamRejectedError("Bot verification failed. Please reload the page and try again.")
 
     order = await order_service.create_order(
@@ -94,13 +93,12 @@ async def submit_order(
         ip_address=ip,
         user_agent=request.headers.get("user-agent"),
         idempotency_key=idempotency_key,
-        status=OrderStatus.CANCELLED if is_honeypot else OrderStatus.NEW,
+        status=OrderStatus.NEW,
     )
 
-    if not is_honeypot:
-        logger.info("order_created", order_id=str(order.id))
-        background.add_task(email.notify_team_of_order, order)
-        background.add_task(email.acknowledge_order, order)
+    logger.info("order_created", order_id=str(order.id))
+    background.add_task(email.notify_team_of_order, order)
+    background.add_task(email.acknowledge_order, order)
 
     return OrderSubmissionResponse(id=order.id)
 

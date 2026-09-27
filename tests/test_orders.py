@@ -35,6 +35,24 @@ async def test_submit_order_creates_inbox_row(
     assert inbox.json()["items"][0]["status"] == "new"
 
 
+async def test_website_field_does_not_cancel_order(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    service_id = await _publish_service(client, auth_headers)
+    response = await client.post(
+        "/api/v1/orders",
+        json={
+            **VALID_ORDER,
+            "service_id": service_id,
+            "website": "https://autofill.example",
+        },
+    )
+    assert response.status_code == 201, response.text
+
+    inbox = await client.get("/api/v1/admin/orders", headers=auth_headers)
+    assert inbox.json()["items"][0]["status"] == "new"
+
+
 async def test_cannot_order_unpublished_service(
     client: AsyncClient, auth_headers: dict[str, str]
 ) -> None:
