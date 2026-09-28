@@ -77,6 +77,7 @@ class ArticleBase(BaseModel):
     published_at: datetime
     seo_title: str | None = Field(None, max_length=80)
     seo_description: str | None = Field(None, max_length=200)
+    image_url: str | None = Field(None, max_length=255)
     is_featured: bool = False
     is_published: bool = True
     sort_order: int = 0
@@ -100,6 +101,7 @@ class ArticleUpdate(BaseModel):
     published_at: datetime | None = None
     seo_title: str | None = Field(None, max_length=80)
     seo_description: str | None = Field(None, max_length=200)
+    image_url: str | None = Field(None, max_length=255)
     is_featured: bool | None = None
     is_published: bool | None = None
     sort_order: int | None = None
@@ -117,6 +119,10 @@ class ArticlePublic(ArticleBase):
 
 class ArticleAdmin(ArticlePublic):
     internal_notes: str | None = None
+
+
+class ArticleMedia(BaseModel):
+    image_url: str
 
 
 class ArticlesPagePublic(ArticlesPageRead):

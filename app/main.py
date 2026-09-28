@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import Response
 from fastapi.staticfiles import StaticFiles
 from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
@@ -10,12 +11,15 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 
 from app import __version__
+from app.api.deps import DbSession
 from app.api.v1.endpoints import health
 from app.api.v1.router import api_router
 from app.core.config import settings
 from app.core.exceptions import register_exception_handlers
 from app.core.logging import configure_logging, get_logger
 from app.db.session import engine
+from app.services.article_media import load_article_image
+from app.services.portfolio_media import load_portfolio_image
 from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.rate_limit import limiter
 
@@ -73,6 +77,33 @@ async def _rate_limit_handler(_: Request, exc: RateLimitExceeded) -> JSONRespons
 
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+
+@app.get("/media/articles/{filename}", include_in_schema=False)
+async def article_image(filename: str, db: DbSession) -> Response:
+    loaded = await load_article_image(db, filename)
+    if loaded is None:
+        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+    data, content_type = loaded
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
+
+@app.get("/media/portfolio/{filename}", include_in_schema=False)
+async def portfolio_image(filename: str, db: DbSession) -> Response:
+    loaded = await load_portfolio_image(db, filename)
+    if loaded is None:
+        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+    data, content_type = loaded
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
+
 
 settings.media_root.mkdir(parents=True, exist_ok=True)
 app.mount("/media", StaticFiles(directory=settings.media_root), name="media")

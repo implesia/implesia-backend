@@ -214,15 +214,14 @@ async def update_project(
         setattr(item, field, value)
     if replace_image:
         item.image_url = image_url
+    if replace_image and previous_image and previous_image != item.image_url:
+        await delete_portfolio_image(db, previous_image)
     await db.commit()
     await db.refresh(item)
-    if replace_image and previous_image and previous_image != item.image_url:
-        delete_portfolio_image(previous_image)
     return item
 
 
 async def delete_project(db: AsyncSession, item: PortfolioProject) -> None:
-    image_url = item.image_url
+    await delete_portfolio_image(db, item.image_url)
     await db.delete(item)
     await db.commit()
-    delete_portfolio_image(image_url)

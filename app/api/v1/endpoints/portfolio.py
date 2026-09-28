@@ -123,10 +123,10 @@ def _validate_update(data: dict[str, object]) -> PortfolioProjectUpdate:
         raise RequestValidationError(exc.errors()) from exc
 
 
-async def _stored_image(image: UploadFile | None) -> str | None:
+async def _stored_image(db: DbSession, image: UploadFile | None) -> str | None:
     if image is None or not image.filename:
         return None
-    return await save_portfolio_image(image)
+    return await save_portfolio_image(db, image)
 
 
 @admin_router.post(
@@ -175,7 +175,7 @@ async def create_project(
         }
     )
     item = await portfolio_service.create_project(
-        db, payload, image_url=await _stored_image(image)
+        db, payload, image_url=await _stored_image(db, image)
     )
     return PortfolioProjectAdmin.model_validate(item)
 
@@ -243,7 +243,7 @@ async def update_project(
         raw["internal_notes"] = _blank(internal_notes)
 
     item = await portfolio_service.get_project_by_id(db, project_id)
-    image_url = await _stored_image(image)
+    image_url = await _stored_image(db, image)
     updated = await portfolio_service.update_project(
         db,
         item,

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import Boolean, Integer, String, Text
+from sqlalchemy import Boolean, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -78,3 +78,16 @@ class PortfolioProject(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<PortfolioProject {self.slug}>"
+
+
+class PortfolioImage(Base):
+    """Card photo bytes. The API disk does not survive a restart."""
+
+    __tablename__ = "portfolio_images"
+
+    name: Mapped[str] = mapped_column(String(80), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<PortfolioImage {self.name}>"

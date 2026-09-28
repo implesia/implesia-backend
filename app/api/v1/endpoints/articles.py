@@ -1,18 +1,20 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from app.api.deps import DbSession, require_editor
 from app.schemas.article import (
     ArticleAdmin,
     ArticleCreate,
+    ArticleMedia,
     ArticlePublic,
     ArticlesPagePublic,
     ArticlesPageRead,
     ArticlesPageUpdate,
     ArticleUpdate,
 )
+from app.services.article_media import save_article_image
 from app.schemas.common import Message, Page, PaginationParams
 from app.services import article_service
 
@@ -29,6 +31,12 @@ async def read_public_articles(db: DbSession, topic: str | None = None) -> Artic
     body.featured = ArticlePublic.model_validate(featured) if featured is not None else None
     body.articles = [ArticlePublic.model_validate(item) for item in articles]
     return body
+
+
+@public_router.get("/slug/{slug}", response_model=ArticlePublic)
+async def read_published_article_by_slug(db: DbSession, slug: str) -> ArticlePublic:
+    item = await article_service.get_article_by_slug(db, slug, published_only=True)
+    return ArticlePublic.model_validate(item)
 
 
 @public_router.get("/{article_id}", response_model=ArticlePublic)
@@ -72,6 +80,15 @@ async def list_articles(
         page=pagination.page,
         page_size=pagination.page_size,
     )
+
+
+@admin_router.post("/media", response_model=ArticleMedia, status_code=status.HTTP_201_CREATED)
+async def upload_article_image(
+    db: DbSession, image: UploadFile = File(...)
+) -> ArticleMedia:
+    image_url = await save_article_image(db, image)
+    await db.commit()
+    return ArticleMedia(image_url=image_url)
 
 
 @admin_router.post("/posts", response_model=ArticleAdmin, status_code=status.HTTP_201_CREATED)

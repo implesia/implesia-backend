@@ -1,4 +1,4 @@
-"""Portfolio card photos, stored in the database so a restart cannot drop them."""
+"""Article cover photos, stored in the database so a restart cannot drop them."""
 
 import re
 import uuid
@@ -8,12 +8,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.exceptions import AppError
-from app.models.portfolio import PortfolioImage
+from app.models.article import ArticleImage
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 _NAME = re.compile(r"^[a-f0-9]{32}\.(jpg|png|gif|webp)$")
+_PREFIX = "/media/articles/"
 
-# First bytes of each format. The declared content type is not trusted.
 _SIGNATURES: tuple[tuple[bytes, str, str], ...] = (
     (b"\xff\xd8\xff", "image/jpeg", "jpg"),
     (b"\x89PNG\r\n\x1a\n", "image/png", "png"),
@@ -34,14 +34,13 @@ def _kind(payload: bytes) -> tuple[str, str] | None:
 
 
 def image_name(public_path: str | None) -> str | None:
-    if not public_path or not public_path.startswith("/media/portfolio/"):
+    if not public_path or not public_path.startswith(_PREFIX):
         return None
-    name = public_path.removeprefix("/media/portfolio/")
+    name = public_path.removeprefix(_PREFIX)
     return name if _NAME.fullmatch(name) else None
 
 
-async def save_portfolio_image(db: AsyncSession, upload: UploadFile) -> str:
-    """Read one upload, keep its bytes with the project row, and return its public path."""
+async def save_article_image(db: AsyncSession, upload: UploadFile) -> str:
     payload = await upload.read(MAX_IMAGE_BYTES + 1)
     kind = _kind(payload)
     if kind is None or len(payload) > MAX_IMAGE_BYTES:
@@ -52,29 +51,28 @@ async def save_portfolio_image(db: AsyncSession, upload: UploadFile) -> str:
         )
     content_type, ext = kind
     name = f"{uuid.uuid4().hex}.{ext}"
-    db.add(PortfolioImage(name=name, content_type=content_type, data=payload))
+    db.add(ArticleImage(name=name, content_type=content_type, data=payload))
     await db.flush()
-    return f"/media/portfolio/{name}"
+    return f"{_PREFIX}{name}"
 
 
-async def delete_portfolio_image(db: AsyncSession, public_path: str | None) -> None:
+async def delete_article_image(db: AsyncSession, public_path: str | None) -> None:
     name = image_name(public_path)
     if name is None:
         return
-    row = await db.get(PortfolioImage, name)
+    row = await db.get(ArticleImage, name)
     if row is not None:
         await db.delete(row)
 
 
-async def load_portfolio_image(db: AsyncSession, filename: str) -> tuple[bytes, str] | None:
+async def load_article_image(db: AsyncSession, filename: str) -> tuple[bytes, str] | None:
     if not _NAME.fullmatch(filename):
         return None
-    row = await db.get(PortfolioImage, filename)
+    row = await db.get(ArticleImage, filename)
     if row is not None:
         return bytes(row.data), row.content_type
-    # Files saved before images lived in the database.
-    path = (settings.media_root / "portfolio" / filename).resolve()
-    root = (settings.media_root / "portfolio").resolve()
+    path = (settings.media_root / "articles" / filename).resolve()
+    root = (settings.media_root / "articles").resolve()
     if path.parent != root or not path.is_file():
         return None
     content_type = {

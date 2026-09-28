@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ConflictError, NotFoundError
 from app.models.article import Article, ArticlesPage
 from app.schemas.article import ArticleCreate, ArticlesPageUpdate, ArticleUpdate
+from app.services.article_media import delete_article_image
 
 DEFAULT_PAGE_SLUG = "articles"
 
@@ -185,13 +186,17 @@ async def update_article(db: AsyncSession, item: Article, payload: ArticleUpdate
         new_slug = _unique_slug(data.get("title", item.title), data["slug"])
         await _assert_slug_free(db, new_slug, exclude_id=item.id)
         data["slug"] = new_slug
+    previous_image = item.image_url
     for field, value in data.items():
         setattr(item, field, value)
+    if "image_url" in data and previous_image and previous_image != item.image_url:
+        await delete_article_image(db, previous_image)
     await db.commit()
     await db.refresh(item)
     return item
 
 
 async def delete_article(db: AsyncSession, item: Article) -> None:
+    await delete_article_image(db, item.image_url)
     await db.delete(item)
     await db.commit()

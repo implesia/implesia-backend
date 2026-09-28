@@ -127,3 +127,40 @@ async def test_duplicate_article_slug_conflicts(
     ).status_code == 201
     again = await client.post("/api/v1/admin/articles/posts", json=ARTICLE, headers=auth_headers)
     assert again.status_code == 409
+
+
+_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0P"
+    b"\x0f\x00\x01\x01\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+async def test_cover_image_is_served_with_the_article(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    uploaded = await client.post(
+        "/api/v1/admin/articles/media",
+        headers=auth_headers,
+        files={"image": ("cover.png", _PNG, "image/png")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    image_url = uploaded.json()["image_url"]
+    assert image_url.startswith("/media/articles/")
+
+    created = await client.post(
+        "/api/v1/admin/articles/posts",
+        json={**ARTICLE, "image_url": image_url},
+        headers=auth_headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["image_url"] == image_url
+
+    image = await client.get(image_url)
+    assert image.status_code == 200
+    assert image.headers["content-type"].startswith("image/")
+
+    public = await client.get("/api/v1/articles/slug/zero-trust-modern-saas")
+    assert public.status_code == 200, public.text
+    assert public.json()["image_url"] == image_url
+    assert "internal_notes" not in public.json()

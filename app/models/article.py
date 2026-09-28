@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, DateTime, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -60,6 +60,7 @@ class Article(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     published_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
     seo_title: Mapped[str | None] = mapped_column(String(80))
     seo_description: Mapped[str | None] = mapped_column(String(200))
+    image_url: Mapped[str | None] = mapped_column(String(255))
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -67,3 +68,16 @@ class Article(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<Article {self.slug}>"
+
+
+class ArticleImage(Base):
+    """Cover photo bytes. The API disk does not survive a restart."""
+
+    __tablename__ = "article_images"
+
+    name: Mapped[str] = mapped_column(String(80), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<ArticleImage {self.name}>"

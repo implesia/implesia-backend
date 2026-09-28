@@ -31,10 +31,12 @@ from app.main import app  # noqa: E402
 from app.models import (  # noqa: E402, F401
     AboutPage,
     Article,
+    ArticleImage,
     ArticlesPage,
     ContactPage,
     EngagementModel,
     Order,
+    PortfolioImage,
     PortfolioPage,
     PortfolioProject,
     PricingPackage,
