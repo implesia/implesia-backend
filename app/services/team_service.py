@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.exceptions import ConflictError, NotFoundError
 from app.models.team import TeamMember, TeamPage
 from app.schemas.team import TeamMemberCreate, TeamMemberUpdate, TeamPageUpdate
+from app.services.team_media import delete_team_image
 
 DEFAULT_PAGE_SLUG = "team"
 
@@ -178,13 +179,17 @@ async def update_member(
         new_slug = _unique_slug(data.get("name", item.name), data["slug"])
         await _assert_slug_free(db, new_slug, exclude_id=item.id)
         data["slug"] = new_slug
+    previous_image = item.image_url
     for field, value in data.items():
         setattr(item, field, value)
+    if "image_url" in data and previous_image and previous_image != item.image_url:
+        await delete_team_image(db, previous_image)
     await db.commit()
     await db.refresh(item)
     return item
 
 
 async def delete_member(db: AsyncSession, item: TeamMember) -> None:
+    await delete_team_image(db, item.image_url)
     await db.delete(item)
     await db.commit()

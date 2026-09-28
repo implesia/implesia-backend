@@ -7,7 +7,7 @@ from app.models.order import Order, OrderStatus
 from app.models.portfolio import PortfolioImage, PortfolioPage, PortfolioProject
 from app.models.pricing import EngagementModel, PricingPackage, PricingPage
 from app.models.service import Service
-from app.models.team import TeamMember, TeamPage
+from app.models.team import TeamImage, TeamMember, TeamPage
 from app.models.user import User, UserRole
 
 __all__ = [
@@ -29,6 +29,7 @@ __all__ = [
     "PricingPage",
     "Service",
     "ServiceArea",
+    "TeamImage",
     "TeamMember",
     "TeamPage",
     "Timeline",

@@ -20,6 +20,7 @@ from app.core.logging import configure_logging, get_logger
 from app.db.session import engine
 from app.services.article_media import load_article_image
 from app.services.portfolio_media import load_portfolio_image
+from app.services.team_media import load_team_image
 from app.middleware import RequestContextMiddleware, SecurityHeadersMiddleware
 from app.rate_limit import limiter
 
@@ -77,6 +78,19 @@ async def _rate_limit_handler(_: Request, exc: RateLimitExceeded) -> JSONRespons
 
 app.include_router(health.router, prefix="/health", tags=["health"])
 app.include_router(api_router, prefix=settings.api_v1_prefix)
+
+
+@app.get("/media/team/{filename}", include_in_schema=False)
+async def team_image(filename: str, db: DbSession) -> Response:
+    loaded = await load_team_image(db, filename)
+    if loaded is None:
+        return Response(status_code=404, headers={"Cache-Control": "no-store"})
+    data, content_type = loaded
+    return Response(
+        content=data,
+        media_type=content_type,
+        headers={"Cache-Control": "public, max-age=86400"},
+    )
 
 
 @app.get("/media/articles/{filename}", include_in_schema=False)

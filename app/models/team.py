@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import Boolean, Integer, String, Text
+from sqlalchemy import Boolean, Integer, LargeBinary, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 from sqlalchemy.types import JSON
 
@@ -66,6 +66,7 @@ class TeamMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
     role: Mapped[str] = mapped_column(String(120), nullable=False)
     bio: Mapped[str] = mapped_column(Text, nullable=False)
     skills: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    image_url: Mapped[str | None] = mapped_column(String(255))
     is_featured: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_published: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     sort_order: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -73,3 +74,16 @@ class TeamMember(UUIDPrimaryKeyMixin, TimestampMixin, Base):
 
     def __repr__(self) -> str:
         return f"<TeamMember {self.slug}>"
+
+
+class TeamImage(Base):
+    """Portrait bytes. The API disk does not survive a restart."""
+
+    __tablename__ = "team_images"
+
+    name: Mapped[str] = mapped_column(String(80), primary_key=True)
+    content_type: Mapped[str] = mapped_column(String(40), nullable=False)
+    data: Mapped[bytes] = mapped_column(LargeBinary, nullable=False)
+
+    def __repr__(self) -> str:
+        return f"<TeamImage {self.name}>"

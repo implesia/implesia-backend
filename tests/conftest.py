@@ -42,6 +42,7 @@ from app.models import (  # noqa: E402, F401
     PricingPackage,
     PricingPage,
     Service,
+    TeamImage,
     TeamMember,
     TeamPage,
 )

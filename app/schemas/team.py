@@ -105,6 +105,7 @@ class TeamMemberBase(BaseModel):
     role: str = Field(min_length=2, max_length=120)
     bio: str = Field(min_length=8, max_length=2000)
     skills: list[str] = Field(default_factory=list)
+    image_url: str | None = Field(None, max_length=255)
     is_featured: bool = False
     is_published: bool = True
     sort_order: int = 0
@@ -120,6 +121,7 @@ class TeamMemberUpdate(BaseModel):
     role: str | None = Field(None, min_length=2, max_length=120)
     bio: str | None = Field(None, min_length=8, max_length=2000)
     skills: list[str] | None = None
+    image_url: str | None = Field(None, max_length=255)
     is_featured: bool | None = None
     is_published: bool | None = None
     sort_order: int | None = None
@@ -137,6 +139,10 @@ class TeamMemberPublic(TeamMemberBase):
 
 class TeamMemberAdmin(TeamMemberPublic):
     internal_notes: str | None = None
+
+
+class TeamMedia(BaseModel):
+    image_url: str
 
 
 class TeamPagePublic(TeamPageRead):

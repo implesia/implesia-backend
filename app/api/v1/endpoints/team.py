@@ -1,7 +1,7 @@
 import uuid
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, status
+from fastapi import APIRouter, Depends, File, UploadFile, status
 
 from app.api.deps import DbSession, require_editor
 from app.schemas.common import Message, Page, PaginationParams
@@ -10,11 +10,13 @@ from app.schemas.team import (
     TeamMemberCreate,
     TeamMemberPublic,
     TeamMemberUpdate,
+    TeamMedia,
     TeamPagePublic,
     TeamPageRead,
     TeamPageUpdate,
 )
 from app.services import team_service
+from app.services.team_media import save_team_image
 
 public_router = APIRouter()
 admin_router = APIRouter(dependencies=[Depends(require_editor)])
@@ -70,6 +72,13 @@ async def list_members(
         page=pagination.page,
         page_size=pagination.page_size,
     )
+
+
+@admin_router.post("/media", response_model=TeamMedia, status_code=status.HTTP_201_CREATED)
+async def upload_member_image(db: DbSession, image: UploadFile = File(...)) -> TeamMedia:
+    image_url = await save_team_image(db, image)
+    await db.commit()
+    return TeamMedia(image_url=image_url)
 
 
 @admin_router.post("/members", response_model=TeamMemberAdmin, status_code=status.HTTP_201_CREATED)

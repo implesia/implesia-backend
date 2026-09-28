@@ -62,6 +62,45 @@ async def test_public_hides_drafts_and_internal_notes(
     assert (await client.get(f"/api/v1/team/members/{draft.json()['id']}")).status_code == 404
 
 
+_PNG = (
+    b"\x89PNG\r\n\x1a\n\x00\x00\x00\rIHDR\x00\x00\x00\x01\x00\x00\x00\x01"
+    b"\x08\x02\x00\x00\x00\x90wS\xde\x00\x00\x00\x0cIDATx\x9cc\xf8\xcf\xc0P"
+    b"\x0f\x00\x01\x01\x01\x00\x18\xdd\x8d\xb4\x00\x00\x00\x00IEND\xaeB`\x82"
+)
+
+
+async def test_portrait_is_served_with_the_member(
+    client: AsyncClient, auth_headers: dict[str, str]
+) -> None:
+    uploaded = await client.post(
+        "/api/v1/admin/team/media",
+        headers=auth_headers,
+        files={"image": ("portrait.png", _PNG, "image/png")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    image_url = uploaded.json()["image_url"]
+    assert image_url.startswith("/media/team/")
+
+    created = await client.post(
+        "/api/v1/admin/team/members",
+        json={**MEMBER, "slug": "portrait-member", "name": "Portrait Member", "image_url": image_url},
+        headers=auth_headers,
+    )
+    assert created.status_code == 201, created.text
+    assert created.json()["image_url"] == image_url
+
+    image = await client.get(image_url)
+    assert image.status_code == 200
+    assert image.headers["content-type"].startswith("image/")
+
+    saved = await client.get(
+        f"/api/v1/admin/team/members/{created.json()['id']}",
+        headers=auth_headers,
+    )
+    assert saved.status_code == 200, saved.text
+    assert saved.json()["image_url"] == image_url
+
+
 async def test_admin_crud_and_auth_boundaries(
     client: AsyncClient, auth_headers: dict[str, str], db_session: AsyncSession
 ) -> None:
