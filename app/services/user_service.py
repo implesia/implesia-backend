@@ -4,9 +4,9 @@ from datetime import UTC, datetime
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.exceptions import AuthenticationError, ConflictError, NotFoundError
+from app.core.exceptions import AuthenticationError, ConflictError, NotFoundError, PermissionDeniedError
 from app.core.security import hash_password, verify_password
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.user import UserCreate, UserUpdate
 
 
@@ -47,12 +47,66 @@ async def create_user(db: AsyncSession, payload: UserCreate) -> User:
     return user
 
 
-async def update_user(db: AsyncSession, user: User, payload: UserUpdate) -> User:
-    for field, value in payload.model_dump(exclude_unset=True).items():
+async def _other_active_superadmins(db: AsyncSession, user_id: uuid.UUID) -> int:
+    total = await db.scalar(
+        select(func.count())
+        .select_from(User)
+        .where(
+            User.role == UserRole.SUPERADMIN,
+            User.is_active.is_(True),
+            User.id != user_id,
+        )
+    )
+    return int(total or 0)
+
+
+async def update_user(db: AsyncSession, user: User, payload: UserUpdate, *, actor: User) -> User:
+    data = payload.model_dump(exclude_unset=True)
+    password = data.pop("password", None)
+    email = data.pop("email", None)
+
+    if email is not None:
+        normalized = str(email).lower()
+        existing = await get_by_email(db, normalized)
+        if existing is not None and existing.id != user.id:
+            raise ConflictError("A user with this email already exists")
+
+    if user.id == actor.id and data.get("is_active") is False:
+        raise PermissionDeniedError("You cannot disable your own account")
+    if user.id == actor.id and "role" in data and data["role"] != user.role:
+        raise PermissionDeniedError("You cannot change your own role")
+
+    next_role = data.get("role", user.role)
+    next_active = data.get("is_active", user.is_active)
+    losing_access = user.role == UserRole.SUPERADMIN and user.is_active and (
+        next_role != UserRole.SUPERADMIN or next_active is False
+    )
+    if losing_access and await _other_active_superadmins(db, user.id) == 0:
+        raise PermissionDeniedError("The last active superadmin must keep that role")
+
+    if email is not None:
+        user.email = str(email).lower()
+    if password:
+        user.password_hash = hash_password(password)
+    for field, value in data.items():
         setattr(user, field, value)
+
     await db.commit()
     await db.refresh(user)
     return user
+
+
+async def delete_user(db: AsyncSession, user: User, *, actor: User) -> None:
+    if user.id == actor.id:
+        raise PermissionDeniedError("You cannot delete your own account")
+    if (
+        user.role == UserRole.SUPERADMIN
+        and user.is_active
+        and await _other_active_superadmins(db, user.id) == 0
+    ):
+        raise PermissionDeniedError("The last active superadmin cannot be deleted")
+    await db.delete(user)
+    await db.commit()
 
 
 async def authenticate(db: AsyncSession, email: str, password: str) -> User:

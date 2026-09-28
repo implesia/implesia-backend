@@ -18,9 +18,11 @@ class UserCreate(UserBase):
 
 
 class UserUpdate(BaseModel):
+    email: EmailStr | None = None
     full_name: str | None = Field(None, min_length=1, max_length=160)
     role: UserRole | None = None
     is_active: bool | None = None
+    password: str | None = Field(None, min_length=12, max_length=72)
 
 
 class UserRead(UserBase):
